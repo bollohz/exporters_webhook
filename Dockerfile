@@ -17,5 +17,4 @@ RUN GOOS=linux GOARCH=amd64 go build -o $BINARY_PATH ./src
 ENV USER_UID=1001
 ENTRYPOINT ["$BINARY_PATH"]
 
-# switch to non-root user
-USER root
+USER $USER_UID

@@ -21,28 +21,20 @@ func main() {
 		FullTimestamp: true,
 	})
 
-	var sidecarCfgFilePath string
-
 	whParams := &WebhookParameters{
 		Port:                 "",
-		SidecarConfiguration: nil,
+		SidecarConfiguration: []Config{},
 		Timeout:              0,
 	}
-	flag.StringVar(&sidecarCfgFilePath, "sidecarCfgFilePath", "/etc/exporters_configuration/config.json", "Path for SidecarContainer Configuration file")
+	flag.StringVar(&whParams.SidecarConfigurationDirectory, "sidecarCfgDirectory", "/etc/exporters_configuration", "Path for SidecarContainer Configuration file")
 	flag.StringVar(&whParams.Port, "port", "8080", "Configuration Port for the WebHook Server")
-	flag.IntVar(&whParams.Timeout, "timeout", 30, "Timeout for graceful Shutdown of the server")
+	flag.IntVar(&whParams.Timeout, "timeout", 300, "Timeout for graceful Shutdown of the server")
 	flag.Parse()
 
 	log.Infoln("Starting WebHook server....")
 	whAddress := fmt.Sprintf("0.0.0.0:%v", whParams.Port)
 	log.Infoln("Address is: ", whAddress)
-	sidecarConfig, err := loadConfig(sidecarCfgFilePath)
-	if err != nil {
-		log.Error("Error loading the sidecar configuration...")
-		panic(err)
-	}
 
-	whParams.SidecarConfiguration = sidecarConfig
 	webhookServer := &WebhookServer{
 		Parameters: whParams,
 		Server: &http.Server{
@@ -82,7 +74,7 @@ func main() {
 	<-channel
 
 
-	timeoutContext, cancel := context.WithTimeout(context.Background(), 30)
+	timeoutContext, cancel := context.WithTimeout(context.Background(), 100 * time.Duration(whParams.Timeout))
 	defer cancel()
 	log.Infoln("Shutting down the server....")
 	_ = webhookServer.Server.Shutdown(timeoutContext)

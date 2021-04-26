@@ -11,9 +11,10 @@ type WebhookServer struct {
 
 
 type WebhookParameters struct {
-	Port string
-	SidecarConfiguration *Config
-	Timeout int
+	Port                          string
+	SidecarConfigurationDirectory string
+	Timeout                       int
+	SidecarConfiguration          []Config
 }
 
 type Config struct {

@@ -20,26 +20,77 @@ var (
 	defaulter     = runtime.ObjectDefaulter(runtimeScheme)
 )
 
+var (
+	exporterAnnotationsKey = "inject-exporters"
+	exporterUpdatedAnnotationsKey = "inject-exporter-updated"
+)
 
-func loadConfig (sidecarCfgFilePath string) (*Config, error){
-	data, err := ioutil.ReadFile(sidecarCfgFilePath)
-	log.Infoln("Sidecar configuration file is located here: ", sidecarCfgFilePath)
+
+func loadConfig (fileSuffix, sidecarCfgDirectoryPath string) (Config, error){
+
+	log.Infoln("Checkin sidecar configuration file located here: ", sidecarCfgDirectoryPath)
+	data, err := ioutil.ReadFile(sidecarCfgDirectoryPath + "/config_" + fileSuffix + ".json")
 	if err != nil {
 		log.Error("Cannot read sidecar configuration file or file not found! ", err)
-		return nil, err
+		return Config{}, err
 	}
 
 	var config Config
 	if err := json.Unmarshal(data, &config); err != nil {
 		log.Error("Cannot unmarshal sidecar configuration JSON file..", err)
-		return nil, err
+		return Config{}, err
 	}
 
-	return &config, nil
+	return config, nil
 }
 
-func (whs *WebhookServer) mutate(review *v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+func (whs *WebhookServer) checkMutate(annotations map[string]string) ([]Config, bool) {
+	if value, ok := annotations[exporterAnnotationsKey]; ok {
+		exporterLists := strings.Split(value, ",")
+		var exporterConfigurationList []Config
 
+		for _, value := range exporterLists {
+			configLoaded, err := loadConfig(value, whs.Parameters.SidecarConfigurationDirectory)
+			if err != nil {
+				return nil, false
+			}
+			exporterConfigurationList = append(exporterConfigurationList, configLoaded)
+		}
+		return exporterConfigurationList, true
+	}
+	return nil, false
+}
+
+
+func (whs *WebhookServer) mutate(review *v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+	var pod corev1.Pod
+	if err := json.Unmarshal(review.Request.Object.Raw, &pod); err != nil {
+		return &v1beta1.AdmissionResponse{
+			Allowed: false,
+			Result:  &metav1.Status{
+				TypeMeta: metav1.TypeMeta{},
+				ListMeta: metav1.ListMeta{},
+				Message:  err.Error(),
+			},
+		}
+	}
+
+
+	config, err := whs.checkMutate(pod.GetAnnotations())
+	if !err {
+		log.Infof("No need to mutate Pod %v", pod.Name)
+		return &v1beta1.AdmissionResponse{
+			Allowed:  true,
+		}
+	}
+
+	whs.Parameters.SidecarConfiguration = config
+	//Now is time to PATCH
+
+
+	return &v1beta1.AdmissionResponse{
+		Allowed:  true,
+	}
 }
 
 func (whs *WebhookServer) healthHandler (writer http.ResponseWriter, request *http.Request) {
@@ -89,7 +140,7 @@ func (whs *WebhookServer) mutateHandler(writer http.ResponseWriter, request *htt
 	}
 
 	if resp, err := json.Marshal(admissionReviewResponse); err != nil {
-		_, err = writer.Write(resp)
+		_, err = writer.Write(resp) //here we terminate the process of /mutate
 		if err != nil {
 			log.Error("Can't write response...", err)
 			http.Error(writer, "Can't write the response", http.StatusInternalServerError)
