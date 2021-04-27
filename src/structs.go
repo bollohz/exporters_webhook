@@ -1,6 +1,7 @@
 package main
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"net/http"
 )
 
@@ -14,10 +15,11 @@ type WebhookParameters struct {
 	Port                          string
 	SidecarConfigurationDirectory string
 	Timeout                       int
-	SidecarConfiguration          []Config
+	SidecarConfiguration          []corev1.Container
 }
 
-type Config struct {
-	ContainerImage string `json:"containerImage"`
-	ContainerCommand string `json:"containerCommand"`
+type MutatingPatch struct {
+	Op    string      `json:"op"`
+	Path  string      `json:"path"`
+	Value interface{} `json:"value,omitempty"`
 }

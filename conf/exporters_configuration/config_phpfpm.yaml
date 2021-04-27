@@ -1,0 +1,14 @@
+name: php-fpm-exporter
+image: hipages/php-fpm_exporter
+ports:
+  - containerPort: 9253
+resources:
+  requests:
+    memory: "10Mi"
+    cpu: "10m"
+  limits:
+    memory: "50Mi"
+    cpu: "200m"
+env:
+  - name: "PHP_FPM_SCRAPE_URI"
+    value: "tcp://localhost:9000/fpm-status"

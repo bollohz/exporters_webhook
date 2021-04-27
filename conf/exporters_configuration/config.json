@@ -1,4 +1,0 @@
-{
-    "containerImage": "phpfpmcontainerimage",
-    "containerCommand": "command"
-}

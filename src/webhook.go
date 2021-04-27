@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"k8s.io/api/admission/v1beta1"
 	"net/http"
@@ -25,33 +26,54 @@ var (
 	exporterUpdatedAnnotationsKey = "inject-exporter-updated"
 )
 
-
-func loadConfig (fileSuffix, sidecarCfgDirectoryPath string) (Config, error){
+func loadConfig (fileSuffix, sidecarCfgDirectoryPath string) (corev1.Container, error){
 
 	log.Infoln("Checkin sidecar configuration file located here: ", sidecarCfgDirectoryPath)
-	data, err := ioutil.ReadFile(sidecarCfgDirectoryPath + "/config_" + fileSuffix + ".json")
+	data, err := ioutil.ReadFile(sidecarCfgDirectoryPath + "/config_" + fileSuffix + ".yaml")
 	if err != nil {
 		log.Error("Cannot read sidecar configuration file or file not found! ", err)
-		return Config{}, err
+		return corev1.Container{}, err
 	}
 
-	var config Config
-	if err := json.Unmarshal(data, &config); err != nil {
+	var config corev1.Container
+	if err := yaml.Unmarshal(data, &config); err != nil {
 		log.Error("Cannot unmarshal sidecar configuration JSON file..", err)
-		return Config{}, err
+		return corev1.Container{}, err
 	}
 
 	return config, nil
 }
 
-func (whs *WebhookServer) checkMutate(annotations map[string]string) ([]Config, bool) {
+func updateAnnotations() MutatingPatch{
+	return MutatingPatch{
+		Op:    "add",
+		Path:  "/metadata/annotations",
+		Value: map[string]string{
+			"injected-by-sidecar": "true",
+		},
+	}
+}
+
+func addSidecarContainerExporter(sidecarContainer corev1.Container) MutatingPatch{
+	var value interface{}
+
+	value = sidecarContainer
+	return MutatingPatch{
+		Op:    "add",
+		Path:  "/spec/containers",
+		Value: value,
+	}
+}
+
+func (whs *WebhookServer) checkMutateAndGetConfig(annotations map[string]string) ([]corev1.Container, bool) {
 	if value, ok := annotations[exporterAnnotationsKey]; ok {
 		exporterLists := strings.Split(value, ",")
-		var exporterConfigurationList []Config
+		var exporterConfigurationList []corev1.Container
 
 		for _, value := range exporterLists {
 			configLoaded, err := loadConfig(value, whs.Parameters.SidecarConfigurationDirectory)
 			if err != nil {
+				log.Errorf("Error during load of config %v: ", value, err)
 				return nil, false
 			}
 			exporterConfigurationList = append(exporterConfigurationList, configLoaded)
@@ -59,6 +81,23 @@ func (whs *WebhookServer) checkMutate(annotations map[string]string) ([]Config, 
 		return exporterConfigurationList, true
 	}
 	return nil, false
+}
+
+func (whs *WebhookServer) createPatch() ([]byte, v1beta1.PatchType, error) {
+	var patches []MutatingPatch
+	patchType := v1beta1.PatchTypeJSONPatch
+
+	for _, value := range whs.Parameters.SidecarConfiguration {
+		log.Infof("Sidecar configuration retrieved is... %v", value)
+		patches = append(patches, addSidecarContainerExporter(value))
+	}
+	patches = append(patches, updateAnnotations())
+	patchBytes, err := json.Marshal(patches)
+	if err != nil {
+		log.Errorf("Error during marshal of patch response")
+		return nil, patchType, err
+	}
+	return patchBytes, patchType, nil
 }
 
 
@@ -76,7 +115,7 @@ func (whs *WebhookServer) mutate(review *v1beta1.AdmissionReview) *v1beta1.Admis
 	}
 
 
-	config, err := whs.checkMutate(pod.GetAnnotations())
+	config, err := whs.checkMutateAndGetConfig(pod.GetAnnotations())
 	if !err {
 		log.Infof("No need to mutate Pod %v", pod.Name)
 		return &v1beta1.AdmissionResponse{
@@ -84,12 +123,26 @@ func (whs *WebhookServer) mutate(review *v1beta1.AdmissionReview) *v1beta1.Admis
 		}
 	}
 
-	whs.Parameters.SidecarConfiguration = config
 	//Now is time to PATCH
+	whs.Parameters.SidecarConfiguration = config
+	patchBytes, JSONPatchType, errorPatch := whs.createPatch()
+	if errorPatch != nil {
+		return &v1beta1.AdmissionResponse{
+			Allowed: false,
+			Result:  &metav1.Status{
+				TypeMeta: metav1.TypeMeta{},
+				ListMeta: metav1.ListMeta{},
+				Message:  errorPatch.Error(),
+			},
+		}
+	}
 
 
 	return &v1beta1.AdmissionResponse{
+		UID: review.Request.UID,
 		Allowed:  true,
+		Patch: patchBytes,
+		PatchType: &JSONPatchType,
 	}
 }
 

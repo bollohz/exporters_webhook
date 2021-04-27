@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
 	"net/http"
 	"os"
 	"os/signal"
@@ -23,7 +24,7 @@ func main() {
 
 	whParams := &WebhookParameters{
 		Port:                 "",
-		SidecarConfiguration: []Config{},
+		SidecarConfiguration: []corev1.Container{},
 		Timeout:              0,
 	}
 	flag.StringVar(&whParams.SidecarConfigurationDirectory, "sidecarCfgDirectory", "/etc/exporters_configuration", "Path for SidecarContainer Configuration file")
