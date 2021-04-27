@@ -14,6 +14,8 @@ type WebhookServer struct {
 type WebhookParameters struct {
 	Port                          string
 	SidecarConfigurationDirectory string
+	CertFile					  string
+	KeyFile					      string
 	Timeout                       int
 	SidecarConfiguration          []corev1.Container
 }

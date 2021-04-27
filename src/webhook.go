@@ -54,15 +54,29 @@ func updateAnnotations() MutatingPatch{
 	}
 }
 
-func addSidecarContainerExporter(sidecarContainer corev1.Container) MutatingPatch{
+func addSidecarContainerExporter(target []corev1.Container, sidecarConfiguration []corev1.Container) []MutatingPatch{
+	var patches []MutatingPatch
+
+	first := len(target) == 0
 	var value interface{}
 
-	value = sidecarContainer
-	return MutatingPatch{
-		Op:    "add",
-		Path:  "/spec/containers",
-		Value: value,
+	for _, add := range sidecarConfiguration {
+		value = add
+		path := "/spec/containers"
+		if first {
+			first = false
+			value = []corev1.Container{add}
+		} else {
+			path = path + "/-"
+		}
+
+		patches = append(patches, MutatingPatch{
+			Op:    "add",
+			Path:  path,
+			Value: value,
+		})
 	}
+	return patches
 }
 
 func (whs *WebhookServer) checkMutateAndGetConfig(annotations map[string]string) ([]corev1.Container, bool) {
@@ -83,14 +97,11 @@ func (whs *WebhookServer) checkMutateAndGetConfig(annotations map[string]string)
 	return nil, false
 }
 
-func (whs *WebhookServer) createPatch() ([]byte, v1beta1.PatchType, error) {
+func (whs *WebhookServer) createPatch(pod *corev1.Pod) ([]byte, v1beta1.PatchType, error) {
 	var patches []MutatingPatch
 	patchType := v1beta1.PatchTypeJSONPatch
 
-	for _, value := range whs.Parameters.SidecarConfiguration {
-		log.Infof("Sidecar configuration retrieved is... %v", value)
-		patches = append(patches, addSidecarContainerExporter(value))
-	}
+	patches = append(patches, addSidecarContainerExporter(pod.Spec.Containers, whs.Parameters.SidecarConfiguration)...)
 	patches = append(patches, updateAnnotations())
 	patchBytes, err := json.Marshal(patches)
 	if err != nil {
@@ -125,7 +136,7 @@ func (whs *WebhookServer) mutate(review *v1beta1.AdmissionReview) *v1beta1.Admis
 
 	//Now is time to PATCH
 	whs.Parameters.SidecarConfiguration = config
-	patchBytes, JSONPatchType, errorPatch := whs.createPatch()
+	patchBytes, JSONPatchType, errorPatch := whs.createPatch(&pod)
 	if errorPatch != nil {
 		return &v1beta1.AdmissionResponse{
 			Allowed: false,

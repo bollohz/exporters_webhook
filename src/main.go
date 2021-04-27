@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	corev1 "k8s.io/api/core/v1"
@@ -29,9 +30,16 @@ func main() {
 	}
 	flag.StringVar(&whParams.SidecarConfigurationDirectory, "sidecarCfgDirectory", "/etc/exporters_configuration", "Path for SidecarContainer Configuration file")
 	flag.StringVar(&whParams.Port, "port", "8080", "Configuration Port for the WebHook Server")
+	flag.StringVar(&whParams.CertFile, "tlsCertFile", "/etc/webhook/certs/cert.pem", "File containing the x509 Certificate for HTTPS.")
+	flag.StringVar(&whParams.KeyFile, "tlsKeyFile", "/etc/webhook/certs/key.pem", "File containing the x509 private key to --tlsCertFile.")
 	flag.IntVar(&whParams.Timeout, "timeout", 300, "Timeout for graceful Shutdown of the server")
 	flag.Parse()
 
+
+	pair, err := tls.LoadX509KeyPair(whParams.CertFile, whParams.KeyFile)
+	if err != nil {
+		log.Errorf("Error during loaf of X509 KeyPair %v", err)
+	}
 	log.Infoln("Starting WebHook server....")
 	whAddress := fmt.Sprintf("0.0.0.0:%v", whParams.Port)
 	log.Infoln("Address is: ", whAddress)
@@ -40,7 +48,9 @@ func main() {
 		Parameters: whParams,
 		Server: &http.Server{
 			Addr:              whAddress,
-			TLSConfig:         nil,
+			TLSConfig:         &tls.Config{
+				Certificates:  []tls.Certificate{pair},
+			},
 			ReadTimeout:       15 * time.Second,
 			ReadHeaderTimeout: 15 * time.Second,
 			WriteTimeout:      15 * time.Second,
