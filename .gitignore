@@ -1,2 +1,5 @@
 ./idea
 exporters_webhook.iml
+/ssl/exporters-webhook.key
+/ssl/exporters-webhook.csr
+/ssl/exporters-webhook.pem

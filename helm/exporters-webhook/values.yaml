@@ -1,0 +1,117 @@
+# Default values for exporters-webhook-chart.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+generalLabels:
+  partOf: webhooks
+  component: webhooks
+  webhookContainerName: webhook-server
+
+executableArgs:
+  timeoutWebhookServer: 30
+  sidecarCfgDirectory: "/etc/exporters_configuration"
+# Port is defined in the service, so will be retrieved from .Values.service.port
+
+configurationMap:
+  config_nginx.yaml: |
+    name: nginx-exporter
+    image: nginx/nginx-prometheus-exporter:0.4.2
+    ports:
+      - containerPort: 9113
+    resources:
+      requests:
+        memory: "10Mi"
+        cpu: "10m"
+      limits:
+        memory: "50Mi"
+        cpu: "200m"
+    args: ["-nginx.scrape-uri", "http://localhost:81/nginx-status"]
+
+  config_phpfpm.yaml: |
+    name: php-fpm-exporter
+    image: hipages/php-fpm_exporter
+    ports:
+      - containerPort: 9253
+    resources:
+      requests:
+        memory: "10Mi"
+        cpu: "10m"
+      limits:
+        memory: "50Mi"
+        cpu: "200m"
+    env:
+      - name: "PHP_FPM_SCRAPE_URI"
+        value: "tcp://localhost:9000/fpm-status"
+
+
+image:
+  repository: bollohz/exporters_webhook
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: 1.0.0
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: "exporters-webhook"
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext:
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1001
+
+service:
+  type: ClusterIP
+  port: 8080
+  healthEndpoint: "/health"
+  mutationEndpoint: "/mutate"
+
+ingress:
+  enabled: false
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths: []
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources:
+   limits:
+     cpu: 500m
+     memory: 256Mi
+   requests:
+     cpu: 200m
+     memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 60
+  targetMemoryUtilizationPercentage: 60
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

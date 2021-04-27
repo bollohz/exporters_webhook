@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "exporters-webhook-chart.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "exporters-webhook-chart.labels" . | nindent 4 }}
+data:
+{{- range $path, $config := .Values.configurationMap }}
+  {{ $path }}: |
+{{ $config | indent 4 }}
+{{- end -}}

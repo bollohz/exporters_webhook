@@ -6,7 +6,6 @@ ENV GO111MODULE=on
 ENV CGO_ENABLED=0
 
 ARG IMAGE_NAME=bollohz/exporters_webhook
-ARG IMAGE_TAG=latest
 ARG BINARY_PATH=/usr/local/bin/exporter_webhook_server
 
 
