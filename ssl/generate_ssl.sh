@@ -83,7 +83,7 @@ done
 
 echo "... creating ${APP}.pem cert file"
 echo "\$serverCert | openssl base64 -d -A -out ${APP}.pem"
-echo "${serverCert}" | openssl base64 -d -A -out ${APP}.pem
+echo "${serverCert}" | openssl base64 -d -A -out "${APP}".pem
 
 echo "CSR NAME IS ${CSR_NAME}"
-echo $(kubectl get csr ${CSR_NAME} -o jsonpath='{.status.certificate}') | openssl base64 -d -A -out ${APP}.pem
+echo $(kubectl get csr "${CSR_NAME}" -o jsonpath='{.status.certificate}') | openssl base64 -d -A -out "${APP}".pem

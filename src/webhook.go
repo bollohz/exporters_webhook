@@ -79,11 +79,11 @@ func addSidecarContainerExporter(target []corev1.Container, sidecarConfiguration
 	return patches
 }
 
-func (whs *WebhookServer) checkMutateAndGetConfig(annotations map[string]string) ([]corev1.Container, bool) {
-	if value, ok := annotations[exporterAnnotationsKey]; ok {
+func (whs *WebhookServer) checkMutateAndGetConfig(labels map[string]string) ([]corev1.Container, bool) {
+	log.Infof("Checking configuration for handling mutate correctly....")
+	if value, ok := labels[exporterAnnotationsKey]; ok {
 		exporterLists := strings.Split(value, ",")
 		var exporterConfigurationList []corev1.Container
-
 		for _, value := range exporterLists {
 			configLoaded, err := loadConfig(value, whs.Parameters.SidecarConfigurationDirectory)
 			if err != nil {
@@ -92,6 +92,7 @@ func (whs *WebhookServer) checkMutateAndGetConfig(annotations map[string]string)
 			}
 			exporterConfigurationList = append(exporterConfigurationList, configLoaded)
 		}
+		log.Infof("Exporter configuration list are.... %v", exporterConfigurationList)
 		return exporterConfigurationList, true
 	}
 	return nil, false
@@ -101,18 +102,23 @@ func (whs *WebhookServer) createPatch(pod *corev1.Pod) ([]byte, v1beta1.PatchTyp
 	var patches []MutatingPatch
 	patchType := v1beta1.PatchTypeJSONPatch
 
+	log.Infof("Add Sidecar configuration...")
 	patches = append(patches, addSidecarContainerExporter(pod.Spec.Containers, whs.Parameters.SidecarConfiguration)...)
+	log.Infof("Add annotations...")
 	patches = append(patches, updateAnnotations())
 	patchBytes, err := json.Marshal(patches)
 	if err != nil {
 		log.Errorf("Error during marshal of patch response")
 		return nil, patchType, err
 	}
+
 	return patchBytes, patchType, nil
 }
 
 
 func (whs *WebhookServer) mutate(review *v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+
+	log.Infof("Mutating the admissionReview.....")
 	var pod corev1.Pod
 	if err := json.Unmarshal(review.Request.Object.Raw, &pod); err != nil {
 		return &v1beta1.AdmissionResponse{
@@ -125,8 +131,7 @@ func (whs *WebhookServer) mutate(review *v1beta1.AdmissionReview) *v1beta1.Admis
 		}
 	}
 
-
-	config, err := whs.checkMutateAndGetConfig(pod.GetAnnotations())
+	config, err := whs.checkMutateAndGetConfig(pod.GetLabels())
 	if !err {
 		log.Infof("No need to mutate Pod %v", pod.Name)
 		return &v1beta1.AdmissionResponse{
@@ -137,6 +142,7 @@ func (whs *WebhookServer) mutate(review *v1beta1.AdmissionReview) *v1beta1.Admis
 	//Now is time to PATCH
 	whs.Parameters.SidecarConfiguration = config
 	patchBytes, JSONPatchType, errorPatch := whs.createPatch(&pod)
+	log.Infof("Sending patch request... %v", patchBytes)
 	if errorPatch != nil {
 		return &v1beta1.AdmissionResponse{
 			Allowed: false,
@@ -147,7 +153,6 @@ func (whs *WebhookServer) mutate(review *v1beta1.AdmissionReview) *v1beta1.Admis
 			},
 		}
 	}
-
 
 	return &v1beta1.AdmissionResponse{
 		UID: review.Request.UID,
@@ -182,6 +187,7 @@ func (whs *WebhookServer) mutateHandler(writer http.ResponseWriter, request *htt
 		log.Error("Error reading the body or body is empty!!")
 		http.Error(writer, "Error reading the body or body is empty!!", http.StatusInternalServerError)
 	}
+	log.Infof("Request body is %v", data)
 	log.Infoln("Successfully get the request....")
 
 	admissionReview := v1beta1.AdmissionReview{}
@@ -192,6 +198,7 @@ func (whs *WebhookServer) mutateHandler(writer http.ResponseWriter, request *htt
 		http.Error(writer, "cannot decode object...", http.StatusInternalServerError)
 	} else {
 		kind := strings.ToLower(admissionReview.Kind)
+		log.Infof("Deserialize object....")
 		if strings.Contains(kind, "pod") {
 			admissionReviewResponse.Response = whs.mutate(&admissionReview)
 			admissionReviewResponse.Response.UID = admissionReview.Request.UID

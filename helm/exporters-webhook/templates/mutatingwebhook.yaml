@@ -7,6 +7,7 @@ metadata:
 webhooks:
   - name: mutateme.{{ .Release.Namespace }}.svc.cluster.local
     clientConfig:
+      caBundle: {{ .Values.caBundle }}
       service:
         name: {{ include "exporters-webhook-chart.fullname" . }}
         namespace: {{ .Release.Namespace }}
@@ -21,3 +22,14 @@ webhooks:
     timeoutSeconds: 5
     reinvocationPolicy: Never
     failurePolicy: Ignore
+    admissionReviewVersions:
+      - v1beta1
+    objectSelector:
+      matchExpressions:
+        - key: Namespace
+          operator: NotIn
+          values:
+            - kube-system
+            - default
+      matchLabels:
+        need-to-inject-exporters: "true"

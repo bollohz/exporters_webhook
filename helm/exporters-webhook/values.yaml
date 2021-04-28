@@ -2,6 +2,9 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+#this variable will be injected by the release_chart script!
+caBundle: ""
+
 generalLabels:
   partOf: webhooks
   component: webhooks
@@ -45,10 +48,10 @@ configurationMap:
 
 
 image:
-  repository: bollohz/exporters_webhook
+  repository: bollohz/exporters-webhook
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: 1.0.0
+  tag: 1.0.1
 
 imagePullSecrets: []
 nameOverride: ""

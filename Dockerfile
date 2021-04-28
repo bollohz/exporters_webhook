@@ -14,6 +14,6 @@ COPY . .
 RUN GOOS=linux GOARCH=amd64 go build -o $BINARY_PATH ./src
 
 ENV USER_UID=1001
-ENTRYPOINT ["$BINARY_PATH"]
+ENTRYPOINT ["/usr/local/bin/exporter_webhook_server"]
 
 USER $USER_UID
