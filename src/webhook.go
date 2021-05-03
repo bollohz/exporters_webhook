@@ -131,6 +131,7 @@ func (whs *WebhookServer) mutate(review *v1beta1.AdmissionReview) *v1beta1.Admis
 		}
 	}
 
+	log.Infof("Pod Spec object is... %v", pod.Spec)
 	config, err := whs.checkMutateAndGetConfig(pod.GetLabels())
 	if !err {
 		log.Infof("No need to mutate Pod %v", pod.Name)
@@ -197,6 +198,7 @@ func (whs *WebhookServer) mutateHandler(writer http.ResponseWriter, request *htt
 		log.Error("Cannot decode object admission review....", err)
 		http.Error(writer, "cannot decode object...", http.StatusInternalServerError)
 	} else {
+		log.Infof("Deserialized admission review > %v", admissionReview)
 		kind := strings.ToLower(admissionReview.Kind)
 		log.Infof("Deserialize object....")
 		if strings.Contains(kind, "pod") {
