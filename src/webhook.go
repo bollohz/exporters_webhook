@@ -85,7 +85,9 @@ func (whs *WebhookServer) checkMutateAndGetConfig(labels map[string]string) ([]c
 		exporterLists := strings.Split(value, ",")
 		var exporterConfigurationList []corev1.Container
 		for _, value := range exporterLists {
-			configLoaded, err := loadConfig(value, whs.Parameters.SidecarConfigurationDirectory)
+			sanitaizedValues := strings.Replace(strings.Replace(value, "-", "", -1), "_", "", -1)
+			sanitaizedValues = strings.Replace(sanitaizedValues, ".", "", -1)
+			configLoaded, err := loadConfig(sanitaizedValues, whs.Parameters.SidecarConfigurationDirectory)
 			if err != nil {
 				log.Errorf("Error during load of config %v: ", value, err)
 				return nil, false
