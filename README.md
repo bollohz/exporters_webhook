@@ -1,7 +1,12 @@
 # Kubernetes Mutating Webhook for Sidecar Injection of Prometheus Exporter Containers
 
-This tutoral shows how to build and deploy a [MutatingAdmissionWebhook](https://kubernetes.io/docs/admin/admission-controllers/#mutatingadmissionwebhook-beta-in-19) that injects a nginx sidecar container into pod prior to persistence of the object.
+This project allows you to dynamically add sidecar container for Metrics export by adding a single label inside your Pod Manifest.
+:mage_man: :mage_man: :mage_man:
+<br/>
 
+
+:shushing_face:
+(In reality you can add any container, just adding the right configuration you can add Exporter for Prometheus, standardize the container definition, backdoor and so on. Please use this with :brain:)
 ## Prerequisites
 
 - [git](https://git-scm.com/downloads)
@@ -28,7 +33,7 @@ admissionregistration.k8s.io/v1beta1
 ```
 ## Stopping the container is based with SIGTERM or SIGKILL signal.
 ```
-# Release it on the cluster 
+# :space_invader: Release it on the cluster 
 
 1. Move in the target K8s context and namespace
 2. Modified the values inside `Makefile` for 
@@ -42,12 +47,12 @@ CSR_NAME   = exporters-webhook.YOUR_NAMESPACE.svc
 ```
 3. Launch the command `make release-chart`
 
-# Or just release the chart!!
+# :rocket: Or just release the chart!!
 
 In any case you can directly use my DockerImage and use just release the chart inside the cluster.
 For doing so, please run the `./helm/release_chart.sh` script from the root folder of the project.
 
-# How does it works?
+# :thinking: How does it works?
 
 1. Add the label `exporter-injection: enabled` in the PodSpec template definiton (it works also for Deployment or Pod object, check the examples.)
 2. Add the label `inject-exporters: value1,value2...` for the exporter you want to add inside the pod definition
@@ -70,7 +75,7 @@ resources:
 args: ["-nginx.scrape-uri", "http://localhost:81/nginx-status"]
 ```
 
-# Throubleshooting 
+# :confused: Throubleshooting 
 
 Sometimes you may find that pod is injected with sidecar container as expected, check the following items:
 
