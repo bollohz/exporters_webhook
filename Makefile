@@ -28,5 +28,4 @@ scan:
 
 release-chart:
 	@echo "Releasing chart..."
-	#$(MAKE) -C ./ssl cert
 	./helm/release_chart.sh $(NAMESPACE)
