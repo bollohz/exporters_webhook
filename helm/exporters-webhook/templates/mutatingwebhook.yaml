@@ -1,3 +1,16 @@
+{{- $tlsCrt := "" }}
+{{- $tlsKey := "" }}
+{{- $caCrt := "" }}
+{{- $ca := genCA "svc-cat-ca" 3650 }}
+{{- $svcName := include "exporters-webhook-chart.fullname" . }}
+{{- $cn := printf "%s.%s.svc" $svcName .Release.Namespace }}
+{{- $altName1 := printf "%s.cluster.local" $cn }}
+{{- $altName2 := printf "%s" $cn }}
+{{- $server := genSignedCert $cn nil (concat (list $altName1 $altName2) .Values.extraAltNames) 365 $ca }}
+{{- $tlsCrt = b64enc $server.Cert }}
+{{- $tlsKey = b64enc $server.Key }}
+{{- $caCrt =  b64enc $ca.Cert }}
+
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
@@ -5,31 +18,44 @@ metadata:
   labels:
     app: mutateme
 webhooks:
-  - name: mutateme.{{ .Release.Namespace }}.svc.cluster.local
+  - name: exportermutate.{{ .Release.Namespace }}.motork.io
     clientConfig:
-      caBundle: {{ .Values.caBundle }}
+      caBundle: {{ $caCrt }}
       service:
         name: {{ include "exporters-webhook-chart.fullname" . }}
         namespace: {{ .Release.Namespace }}
         path: "/mutate"
         port: {{ .Values.service.port }}
     rules:
-      - operations: ["CREATE"]
-        apiGroups: [""]
-        apiVersions: ["v1"]
-        resources: ["pods"]
+      - operations:
+          - CREATE
+          - UPDATE
+        apiGroups:
+          - ""
+          - apps
+        apiVersions:
+          - v1
+        resources:
+          - pods
+          - deployments
     sideEffects: None
-    timeoutSeconds: 5
-    reinvocationPolicy: Never
-    failurePolicy: Ignore
+    failurePolicy: Fail
+    matchPolicy: Equivalent
     admissionReviewVersions:
       - v1beta1
     objectSelector:
-      matchExpressions:
-        - key: Namespace
-          operator: NotIn
-          values:
-            - kube-system
-            - default
       matchLabels:
-        need-to-inject-exporters: "true"
+        exporter-injection: "enabled"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.tlsKeyCert.secretName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "exporters-webhook-chart.labels" . | nindent 4 }}
+data:
+  tls.crt: {{ $tlsCrt }}
+  tls.key: {{ $tlsKey }}
+  ca.crt:  {{ $caCrt }}

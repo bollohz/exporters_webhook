@@ -31,14 +31,14 @@ func main() {
 	flag.StringVar(&whParams.SidecarConfigurationDirectory, "sidecarCfgDirectory", "/etc/exporters_configuration", "Path for SidecarContainer Configuration file")
 	flag.StringVar(&whParams.Port, "port", "8080", "Configuration Port for the WebHook Server")
 	flag.StringVar(&whParams.CertFile, "tlsCertFile", "/etc/webhook/certs/cert.pem", "File containing the x509 Certificate for HTTPS.")
-	flag.StringVar(&whParams.KeyFile, "tlsKeyFile", "/etc/webhook/certs/key.pem", "File containing the x509 private key to --tlsCertFile.")
+	flag.StringVar(&whParams.KeyFile, "tlsKeyFile", "/etc/webhook/certs/key.pem", "File containing the x509 private key to -tlsCertFile.")
 	flag.IntVar(&whParams.Timeout, "timeout", 300, "Timeout for graceful Shutdown of the server")
 	flag.Parse()
 
 
 	pair, err := tls.LoadX509KeyPair(whParams.CertFile, whParams.KeyFile)
 	if err != nil {
-		log.Errorf("Error during loaf of X509 KeyPair %v", err)
+		log.Errorf("Error during load of X509 KeyPair %v", err)
 	}
 	log.Infoln("Starting WebHook server....")
 	whAddress := fmt.Sprintf("0.0.0.0:%v", whParams.Port)
@@ -49,6 +49,7 @@ func main() {
 		Server: &http.Server{
 			Addr:              whAddress,
 			TLSConfig:         &tls.Config{
+				InsecureSkipVerify: true,
 				Certificates:  []tls.Certificate{pair},
 			},
 			ReadTimeout:       15 * time.Second,
@@ -64,14 +65,13 @@ func main() {
 	muxRouter.HandleFunc("/health", webhookServer.healthHandler).
 		Methods(http.MethodGet).
 		Schemes("http", "https")
-	muxRouter.HandleFunc("/mutate", webhookServer.mutateHandler).
-		Methods(http.MethodGet).
-		Schemes("http", "https")
+	muxRouter.HandleFunc("/mutate", webhookServer.mutateHandler)
 	//Setting handler in server
 	webhookServer.Server.Handler = muxRouter
 
 	go func() {
-		err := webhookServer.Server.ListenAndServe()
+		log.Infoln("Server started...")
+		err := webhookServer.Server.ListenAndServeTLS(whParams.CertFile, whParams.KeyFile)
 		if err != nil {
 			log.Error("ERROR STARTING THE WEBHOOK SERVER! %v", err)
 			panic(err)

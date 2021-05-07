@@ -13,7 +13,14 @@ generalLabels:
 executableArgs:
   timeoutWebhookServer: 30
   sidecarCfgDirectory: "/etc/exporters_configuration"
+  tlsKeyFilePath: /etc/webhook/certs/tls.key
+  tlsCertFilePath: /etc/webhook/certs/tls.crt
 # Port is defined in the service, so will be retrieved from .Values.service.port
+
+tlsKeyCert:
+  volumeName: exporters-webhook-cert
+  volumeMountPath: /etc/webhook/certs
+  secretName: exporters-webhook-secrets #Written in ../ssl/Makefile for make cert script
 
 configurationMap:
   config_nginx.yaml: |
@@ -46,12 +53,13 @@ configurationMap:
       - name: "PHP_FPM_SCRAPE_URI"
         value: "tcp://localhost:9000/fpm-status"
 
+extraAltNames: []
 
 image:
   repository: bollohz/exporters-webhook
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: 1.0.1
+  tag: 1.0.6
 
 imagePullSecrets: []
 nameOverride: ""
@@ -81,7 +89,8 @@ securityContext:
 
 service:
   type: ClusterIP
-  port: 8080
+  port: 443
+  targetPort: 8443
   healthEndpoint: "/health"
   mutationEndpoint: "/mutate"
 
@@ -108,7 +117,7 @@ resources:
 
 autoscaling:
   enabled: true
-  minReplicas: 2
+  minReplicas: 1
   maxReplicas: 10
   targetCPUUtilizationPercentage: 60
   targetMemoryUtilizationPercentage: 60

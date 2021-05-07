@@ -3,10 +3,10 @@ package main
 import (
 	"encoding/json"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"k8s.io/api/admission/v1beta1"
 	"net/http"
+	"sigs.k8s.io/yaml"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -201,12 +201,13 @@ func (whs *WebhookServer) mutateHandler(writer http.ResponseWriter, request *htt
 		http.Error(writer, "cannot decode object...", http.StatusInternalServerError)
 	} else {
 		log.Infof("Deserialized admission review > %v", admissionReview)
-		kind := strings.ToLower(admissionReview.Kind)
 		log.Infof("Deserialize object....")
-		if strings.Contains(kind, "pod") {
+		if strings.Contains(strings.ToLower(admissionReview.Request.RequestResource.Resource), "pod") {
+			log.Infof("Going to call mutation....")
 			admissionReviewResponse.Response = whs.mutate(&admissionReview)
 			admissionReviewResponse.Response.UID = admissionReview.Request.UID
 		} else {
+			log.Infof("Return basic response...")
 			admissionReviewResponse.Response = &v1beta1.AdmissionResponse{
 				UID:              admissionReview.Request.UID,
 				Allowed:          true,
@@ -214,12 +215,16 @@ func (whs *WebhookServer) mutateHandler(writer http.ResponseWriter, request *htt
 		}
 	}
 
-	if resp, err := json.Marshal(admissionReviewResponse); err != nil {
-		_, err = writer.Write(resp) //here we terminate the process of /mutate
-		if err != nil {
-			log.Error("Can't write response...", err)
-			http.Error(writer, "Can't write the response", http.StatusInternalServerError)
-		}
+	resp, err := json.Marshal(admissionReviewResponse)
+	if err != nil {
+		log.Errorf("Cannot marshalize the response of admissionReview.... %v", err)
+		http.Error(writer, "Cannot marshalize the object", http.StatusInternalServerError)
+	}
+
+	log.Infof("Writing response.... %v", admissionReviewResponse.Response)
+	if _, err := writer.Write(resp); err != nil {
+		log.Errorf("Cannot write the response %v", err)
+		http.Error(writer, "Cannot Write the response", http.StatusInternalServerError)
 	}
 
 }

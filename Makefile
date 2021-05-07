@@ -1,6 +1,6 @@
 IMAGE_REPO = docker.io/bollohz
 IMAGE_NAME = exporters-webhook
-IMAGE_TAG  = 1.0.1
+IMAGE_TAG  = 1.0.6
 APP		   = exporters-webhook
 NAMESPACE  = utils
 CSR_NAME   = exporters-webhook.utils.svc
@@ -28,5 +28,5 @@ scan:
 
 release-chart:
 	@echo "Releasing chart..."
-	$(MAKE) -C ./ssl cert
-	./helm/release_chart.sh $(NAMESPACE) $(CSR_NAME)
+	#$(MAKE) -C ./ssl cert
+	./helm/release_chart.sh $(NAMESPACE)

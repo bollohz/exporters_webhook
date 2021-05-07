@@ -26,8 +26,6 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "exporters-webhook-chart.serviceAccountName" . }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Values.generalLabels.webhookContainerName }}
           securityContext:
@@ -37,19 +35,23 @@ spec:
           args:
             - -sidecarCfgDirectory={{ .Values.executableArgs.sidecarCfgDirectory }}
             - -timeout={{ .Values.executableArgs.timeoutWebhookServer }}
-            - -port={{ .Values.service.port }}
+            - -port={{ .Values.service.targetPort }}
+            - -tlsCertFile={{ .Values.executableArgs.tlsCertFilePath }}
+            - -tlsKeyFile={{ .Values.executableArgs.tlsKeyFilePath }}
           ports:
             - name: http
-              containerPort: {{ .Values.service.port }}
+              containerPort: {{ .Values.service.targetPort }}
               protocol: TCP
           livenessProbe:
             httpGet:
               path: {{ .Values.service.healthEndpoint | quote }}
               port: http
+              scheme: HTTPS
           readinessProbe:
             httpGet:
               path: {{ .Values.service.healthEndpoint | quote }}
               port: http
+              scheme: HTTPS
           volumeMounts:
             {{ $basePathDirectory := .Values.executableArgs.sidecarCfgDirectory }}
             {{- range $path, $config := .Values.configurationMap }}
@@ -57,12 +59,22 @@ spec:
               mountPath: "{{ $basePathDirectory }}/{{ $path }}"
               subPath: {{ $path }}
           {{- end }}
+          {{- with .Values.tlsKeyCert }}
+            - name: {{ .volumeName }}
+              mountPath: {{ .volumeMountPath | quote }}
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
         - name: configuration-map
           configMap:
             name: {{ include "exporters-webhook-chart.fullname" . }}
+        {{- with .Values.tlsKeyCert }}
+        - name: {{ .volumeName }}
+          secret:
+            defaultMode: 420
+            secretName: {{ .secretName }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -4,9 +4,9 @@ ports:
   - containerPort: 9113
 resources:
   requests:
-    memory: "10Mi"
-    cpu: "10m"
+    memory: 10Mi
+    cpu: 10m
   limits:
-    memory: "50Mi"
-    cpu: "200m"
+    memory: 50Mi
+    cpu: 200m
 args: ["-nginx.scrape-uri", "http://localhost:81/nginx-status"]
